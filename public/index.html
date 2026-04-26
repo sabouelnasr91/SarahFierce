@@ -42,6 +42,11 @@
       Follow-Through
     </button>
 
+    <button class="nav-item" data-view="chat">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chat
+    </button>
+
     <div class="nav-divider"></div>
 
     <button class="nav-item" data-view="history">
@@ -453,6 +458,55 @@
       <button class="btn-ghost btn-danger" id="btn-clear-history">Clear All</button>
     </div>
     <div id="history-full-list" class="history-list"></div>
+  </div>
+
+  <!-- ───── CHAT ───── -->
+  <div id="view-chat" class="view chat-view">
+
+    <div class="chat-topbar">
+      <div class="chat-topbar-info">
+        <div class="chat-avatar-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <div>
+          <div class="chat-name">Admin AI Hub</div>
+          <div class="chat-status"><span class="status-dot"></span>Online · PLC Assistant</div>
+        </div>
+      </div>
+      <button class="btn-ghost" id="btn-clear-chat">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        New chat
+      </button>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-welcome" id="chat-welcome">
+        <div class="welcome-avatar">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <h3>Admin AI Hub</h3>
+        <p>Your PLC planning partner. Ask me anything — I'll build agendas, write scripts, clean up notes, and help you lead better meetings.</p>
+        <div class="suggested-prompts">
+          <button class="prompt-chip">Generate this week's PLC for English 9</button>
+          <button class="prompt-chip">Write a follow-up email from today's meeting</button>
+          <button class="prompt-chip">My teachers disagree on what "proficient" means — help</button>
+          <button class="prompt-chip">Give me a 60-min reteach planning agenda</button>
+          <button class="prompt-chip">What equity questions should I ask in my PLC?</button>
+          <button class="prompt-chip">How do I handle a teacher who dominates discussion?</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrap">
+        <textarea id="chat-input" placeholder="Ask anything about your PLC…" rows="1"></textarea>
+        <button class="chat-send-btn" id="chat-send" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="chat-disclaimer">Student PII is never stored · Powered by Claude AI · ~$0.03 per conversation</div>
+    </div>
+
   </div>
 
 </main>

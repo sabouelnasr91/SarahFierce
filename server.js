@@ -160,6 +160,36 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
+app.post('/api/chat', async (req, res) => {
+  const { messages } = req.body;
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured on server.' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const stream = client.messages.stream({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      system: SYSTEM_PROMPT,
+      messages,
+    });
+    stream.on('text',  (text) => res.write('data: ' + JSON.stringify({ text }) + '\n\n'));
+    stream.on('error', (err)  => { res.write('data: ' + JSON.stringify({ error: err.message }) + '\n\n'); res.end(); });
+    stream.on('finalMessage', () => { res.write('data: [DONE]\n\n'); res.end(); });
+  } catch (err) {
+    res.write('data: ' + JSON.stringify({ error: err.message }) + '\n\n');
+    res.end();
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n  Admin AI Hub running at http://localhost:${PORT}\n`);
 });

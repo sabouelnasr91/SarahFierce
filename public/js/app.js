@@ -8,6 +8,7 @@ const state = {
   ftParsed: {},
   ftActiveSection: 'summary',
   timer: { total: 3600, remaining: 3600, running: false, interval: null },
+  chat: { messages: [], streaming: false, streamingEl: null },
   segments: [],
   currentSegment: 0,
   parkingLot: [],
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   wireFollowThrough();
   wireSettings();
   wireOutputActions();
+  wireChat();
 });
 
 /* ─── NAVIGATION ─────────────────────────────────────────── */
@@ -653,3 +655,224 @@ function escapeHtml(str) {
 const style = document.createElement('style');
 style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
 document.head.appendChild(style);
+
+/* ─── CHAT ───────────────────────────────────────────────── */
+function wireChat() {
+  const input   = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('chat-send');
+
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+    sendBtn.disabled = !input.value.trim();
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+  });
+
+  sendBtn.addEventListener('click', sendChatMessage);
+
+  document.getElementById('btn-clear-chat').addEventListener('click', clearChat);
+
+  document.querySelectorAll('.prompt-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      input.value = chip.textContent;
+      input.dispatchEvent(new Event('input'));
+      sendChatMessage();
+    });
+  });
+}
+
+async function sendChatMessage() {
+  if (state.chat.streaming) return;
+
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  if (hasPII(text)) {
+    showToast('Possible student PII detected. Please anonymize first.', 'error');
+    return;
+  }
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('chat-send').disabled = true;
+
+  document.getElementById('chat-welcome')?.remove();
+
+  state.chat.messages.push({ role: 'user', content: text });
+  appendChatMessage('user', text);
+
+  const typingEl = appendTypingIndicator();
+  state.chat.streaming = true;
+  state.chat.streamingEl = null;
+  let aiText = '';
+
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: state.chat.messages }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || resp.statusText);
+    }
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let firstChunk = true;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') {
+          finalizeChatMessage(aiText);
+          state.chat.messages.push({ role: 'assistant', content: aiText });
+          state.chat.streaming = false;
+          return;
+        }
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.error) throw new Error(parsed.error);
+          if (parsed.text) {
+            if (firstChunk) { typingEl.remove(); firstChunk = false; }
+            aiText += parsed.text;
+            updateStreamingBubble(aiText);
+          }
+        } catch (parseErr) {
+          if (parseErr.message !== 'Unexpected end of JSON input') throw parseErr;
+        }
+      }
+    }
+  } catch (err) {
+    typingEl?.remove();
+    appendChatMessage('ai', `Sorry, something went wrong: ${err.message}`);
+    showToast('Error: ' + err.message, 'error');
+  } finally {
+    state.chat.streaming = false;
+    state.chat.streamingEl = null;
+    document.getElementById('chat-send').disabled = false;
+    scrollChatToBottom();
+  }
+}
+
+function appendChatMessage(role, text) {
+  const container = document.getElementById('chat-messages');
+  const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const initials = role === 'user' ? 'AP' : 'AI';
+
+  const msg = document.createElement('div');
+  msg.className = `chat-msg ${role}`;
+  msg.innerHTML = `
+    <div class="msg-avatar">${initials}</div>
+    <div class="msg-body">
+      <div class="msg-bubble">${role === 'ai' ? `<div class="markdown-body">${marked.parse(text)}</div>` : escapeHtml(text)}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="msg-time">${time}</span>
+        ${role === 'ai' ? `<div class="msg-actions"><button class="msg-copy-btn" onclick="copyText(${JSON.stringify(text)})"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div>` : ''}
+      </div>
+    </div>`;
+  container.appendChild(msg);
+  scrollChatToBottom();
+  return msg;
+}
+
+function appendTypingIndicator() {
+  const container = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = 'typing-indicator';
+  el.innerHTML = `
+    <div class="msg-avatar" style="background:var(--navy);color:var(--gold);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;">AI</div>
+    <div class="typing-dots"><span></span><span></span><span></span></div>`;
+  container.appendChild(el);
+  scrollChatToBottom();
+  return el;
+}
+
+function updateStreamingBubble(text) {
+  if (!state.chat.streamingEl) {
+    const container = document.getElementById('chat-messages');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const msg = document.createElement('div');
+    msg.className = 'chat-msg ai';
+    msg.innerHTML = `
+      <div class="msg-avatar">AI</div>
+      <div class="msg-body">
+        <div class="msg-bubble streaming-cursor"><span class="stream-text"></span></div>
+        <span class="msg-time">${time}</span>
+      </div>`;
+    container.appendChild(msg);
+    state.chat.streamingEl = msg;
+  }
+  const span = state.chat.streamingEl.querySelector('.stream-text');
+  if (span) span.textContent = text;
+  scrollChatToBottom();
+}
+
+function finalizeChatMessage(text) {
+  if (!state.chat.streamingEl) { appendChatMessage('ai', text); return; }
+  const bubble = state.chat.streamingEl.querySelector('.msg-bubble');
+  bubble.classList.remove('streaming-cursor');
+  bubble.innerHTML = `<div class="markdown-body">${marked.parse(text)}</div>`;
+
+  const time = state.chat.streamingEl.querySelector('.msg-time');
+  const body = state.chat.streamingEl.querySelector('.msg-body');
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+  actions.innerHTML = `<button class="msg-copy-btn" onclick="copyText(${JSON.stringify(text)})"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button>`;
+  const timeWrap = document.createElement('div');
+  timeWrap.style.cssText = 'display:flex;align-items:center;gap:6px';
+  timeWrap.appendChild(time.cloneNode(true));
+  timeWrap.appendChild(actions);
+  time.replaceWith(timeWrap);
+}
+
+function clearChat() {
+  state.chat.messages = [];
+  state.chat.streamingEl = null;
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = `
+    <div class="chat-welcome" id="chat-welcome">
+      <div class="welcome-avatar">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <h3>Admin AI Hub</h3>
+      <p>Your PLC planning partner. Ask me anything — I'll build agendas, write scripts, clean up notes, and help you lead better meetings.</p>
+      <div class="suggested-prompts">
+        <button class="prompt-chip">Generate this week's PLC for English 9</button>
+        <button class="prompt-chip">Write a follow-up email from today's meeting</button>
+        <button class="prompt-chip">My teachers disagree on what "proficient" means — help</button>
+        <button class="prompt-chip">Give me a 60-min reteach planning agenda</button>
+        <button class="prompt-chip">What equity questions should I ask in my PLC?</button>
+        <button class="prompt-chip">How do I handle a teacher who dominates discussion?</button>
+      </div>
+    </div>`;
+  document.querySelectorAll('.prompt-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const input = document.getElementById('chat-input');
+      input.value = chip.textContent;
+      input.dispatchEvent(new Event('input'));
+      sendChatMessage();
+    });
+  });
+  document.getElementById('chat-send').disabled = true;
+  showToast('Chat cleared.');
+}
+
+function scrollChatToBottom() {
+  const container = document.getElementById('chat-messages');
+  if (container) container.scrollTop = container.scrollHeight;
+}
