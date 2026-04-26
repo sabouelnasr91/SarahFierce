@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin AI Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy:      #1B3A5C;
+  --navy-dark: #122840;
+  --gold:      #E8A020;
+  --gold-pale: #FFF8ED;
+  --bg:        #F4F7FB;
+  --card:      #FFFFFF;
+  --text-1:    #0F1923;
+  --text-2:    #3D4F63;
+  --text-3:    #6B7D90;
+  --border:    #DDE3ED;
+  --green:     #1E7E4A;
+  --amber:     #A66800;
+  --red:       #C0392B;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── layout ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 100vh;
+}
+
+/* ── top bar ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--navy);
+  color: #fff;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-icon {
+  width: 34px; height: 34px;
+  background: var(--gold);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--navy);
+  flex-shrink: 0;
+}
+.topbar-name { font-size: .9rem; font-weight: 700; }
+.topbar-sub  { font-size: .68rem; color: rgba(255,255,255,.55); }
+.status-dot-wrap { display: flex; align-items: center; gap: 5px; font-size: .72rem; color: rgba(255,255,255,.6); }
+.sdot { width: 7px; height: 7px; border-radius: 50%; background: #48BB78; display: inline-block; animation: sdPulse 2.5s infinite; }
+@keyframes sdPulse { 0%,100%{opacity:1}50%{opacity:.4} }
+.clear-btn {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  color: rgba(255,255,255,.8);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.clear-btn:hover { background: rgba(255,255,255,.22); color: #fff; }
+
+/* ── messages ── */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── welcome ── */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 24px 20px;
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+}
+.welcome-icon {
+  width: 56px; height: 56px;
+  background: var(--navy);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold);
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(27,58,92,.25);
+}
+.welcome h3 { font-size: 1.05rem; font-weight: 800; color: var(--navy); margin-bottom: 8px; }
+.welcome p  { font-size: .82rem; color: var(--text-2); max-width: 340px; }
+.prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.pchip {
+  padding: 7px 13px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: .77rem;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.pchip:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+/* ── individual messages ── */
+.msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 3px 18px;
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+}
+.msg.user { flex-direction: row-reverse; }
+
+.avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+.msg.ai   .avatar { background: var(--navy); color: var(--gold); }
+.msg.user .avatar { background: var(--gold); color: var(--navy); }
+
+.msg-body { display: flex; flex-direction: column; gap: 3px; max-width: 78%; }
+.msg.user .msg-body { align-items: flex-end; }
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: 17px;
+  font-size: .845rem;
+  line-height: 1.65;
+  word-break: break-word;
+}
+.msg.ai   .bubble {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.msg.user .bubble {
+  background: var(--navy);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.msg-time { font-size: .65rem; color: var(--text-3); padding: 0 3px; }
+
+/* ── markdown inside bubbles ── */
+.md h2 { font-size: .9rem; font-weight: 700; color: var(--navy); margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--gold); }
+.md h3 { font-size: .845rem; font-weight: 700; margin: 10px 0 4px; }
+.md p  { margin: 6px 0; }
+.md ul, .md ol { padding-left: 18px; margin: 6px 0; }
+.md li { margin: 3px 0; }
+.md strong { font-weight: 700; }
+.md blockquote {
+  border-left: 3px solid var(--gold);
+  padding: 8px 12px;
+  background: var(--gold-pale);
+  border-radius: 0 6px 6px 0;
+  margin: 8px 0;
+  font-style: italic;
+  color: var(--navy);
+}
+.md table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .78rem; }
+.md thead { background: var(--navy); color: #fff; }
+.md th { padding: 7px 10px; text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; }
+.md td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.md tr:nth-child(even) td { background: var(--bg); }
+.md code { background: var(--bg); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; font-size: .8em; font-family: monospace; }
+.md p:first-child { margin-top: 0; }
+.md p:last-child  { margin-bottom: 0; }
+
+/* ── copy button ── */
+.copy-btn {
+  background: none; border: none;
+  font-size: .7rem; color: var(--text-3);
+  cursor: pointer; padding: 2px 6px;
+  border-radius: 4px; font-family: inherit;
+  opacity: 0; transition: opacity .15s, background .12s;
+}
+.msg:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: var(--bg); color: var(--text-1); }
+
+/* ── thinking indicator ── */
+.thinking {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 3px 18px;
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
+}
+.dots {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  border-bottom-left-radius: 4px;
+  padding: 12px 16px;
+  display: flex; gap: 5px; align-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.dots span {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.dots span:nth-child(2) { animation-delay: .15s; }
+.dots span:nth-child(3) { animation-delay: .30s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px);background:var(--navy)} }
+
+/* ── PII warning ── */
+.pii-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: #FFF0F0;
+  color: var(--red);
+  font-size: .78rem;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-top: 1px solid #FECACA;
+  flex-shrink: 0;
+}
+.pii-bar.show { display: flex; }
+
+/* ── input area ── */
+.input-area {
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  padding: 12px 18px 14px;
+  flex-shrink: 0;
+}
+.input-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 8px 8px 14px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.input-wrap:focus-within {
+  border-color: #4a7ab5;
+  box-shadow: 0 0 0 3px rgba(74,122,181,.12);
+  background: #fff;
+}
+#chat-in {
+  flex: 1; border: none; background: none;
+  font-family: inherit; font-size: .875rem;
+  resize: none; outline: none;
+  max-height: 120px; overflow-y: auto;
+  color: var(--text-1); line-height: 1.5;
+}
+#chat-in::placeholder { color: var(--text-3); }
+.send-btn {
+  width: 36px; height: 36px;
+  background: var(--navy); border: none;
+  border-radius: 9px; color: #fff;
+  cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s, transform .1s;
+}
+.send-btn:hover    { background: var(--navy-dark); }
+.send-btn:active   { transform: scale(.9); }
+.send-btn:disabled { background: var(--border); cursor: not-allowed; }
+.input-note {
+  font-size: .66rem; color: var(--text-3);
+  text-align: center; margin-top: 7px;
+}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <div>
+        <div class="topbar-name">Admin AI Hub</div>
+        <div class="status-dot-wrap"><span class="sdot"></span>PLC Assistant · Online</div>
+      </div>
+    </div>
+    <button class="clear-btn" onclick="clearChat()">New chat</button>
+  </div>
+
+  <!-- MESSAGES -->
+  <div class="messages" id="msgs">
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <h3>Admin AI Hub</h3>
+      <p>Your PLC planning partner. Ask me anything — agendas, scripts, reteach plans, follow-up emails, and more.</p>
+      <div class="prompts">
+        <button class="pchip" onclick="usePrompt(this)">Generate this week's PLC package</button>
+        <button class="pchip" onclick="usePrompt(this)">Write a follow-up email from today's meeting</button>
+        <button class="pchip" onclick="usePrompt(this)">My teachers can't agree on what proficient looks like</button>
+        <button class="pchip" onclick="usePrompt(this)">Give me a 60-min reteach planning agenda</button>
+        <button class="pchip" onclick="usePrompt(this)">What equity questions should I ask in my PLC?</button>
+        <button class="pchip" onclick="usePrompt(this)">How do I redirect an off-track PLC conversation?</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PII WARNING -->
+  <div class="pii-bar" id="pii-bar">
+    ⚠️ Possible student name or ID detected. Please anonymize before sending (e.g., use "Student A" or describe patterns by group).
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-area">
+    <div class="input-wrap">
+      <textarea id="chat-in" rows="1" placeholder="Ask anything about your PLC…"></textarea>
+      <button class="send-btn" id="send-btn" onclick="send()" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div class="input-note">Student PII is never stored · Powered by Claude AI · ~$0.03 per message</div>
+  </div>
+
+</div>
+
+<script>
+// ─── state ───────────────────────────────────────────────────
+const history = [];   // [{role, content}]
+let busy = false;
+
+// ─── input auto-resize + send enable ─────────────────────────
+const inp = document.getElementById('chat-in');
+const btn = document.getElementById('send-btn');
+inp.addEventListener('input', () => {
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+  btn.disabled = !inp.value.trim() || busy;
+  checkPII(inp.value);
+});
+inp.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+// ─── PII check ────────────────────────────────────────────────
+function checkPII(text) {
+  const patterns = [
+    /\b[A-Z][a-z]+\s+[A-Z][a-z]+\s+(scored|earned|received|got|failed|passed)\b/,
+    /\bstudent\s+(id|number|#)\s*:?\s*\d{3,}/i,
+    /\b\d{3}-\d{2}-\d{4}\b/,
+  ];
+  const hasPII = patterns.some(p => p.test(text));
+  document.getElementById('pii-bar').classList.toggle('show', hasPII);
+}
+
+// ─── send message ─────────────────────────────────────────────
+function send() {
+  if (busy) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  if (document.getElementById('pii-bar').classList.contains('show')) return;
+
+  inp.value = '';
+  inp.style.height = 'auto';
+  btn.disabled = true;
+  document.getElementById('pii-bar').classList.remove('show');
+
+  document.getElementById('welcome')?.remove();
+
+  history.push({ role: 'user', content: text });
+  addMsg('user', text);
+  const thinkEl = addThinking();
+  busy = true;
+
+  google.script.run
+    .withSuccessHandler(reply => {
+      thinkEl.remove();
+      history.push({ role: 'assistant', content: reply });
+      addMsg('ai', reply);
+      busy = false;
+      btn.disabled = !inp.value.trim();
+    })
+    .withFailureHandler(err => {
+      thinkEl.remove();
+      addMsg('ai', '**Error:** ' + err.message);
+      busy = false;
+      btn.disabled = !inp.value.trim();
+    })
+    .callClaude(history);
+}
+
+// ─── render helpers ───────────────────────────────────────────
+function addMsg(role, text) {
+  const msgs = document.getElementById('msgs');
+  const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const div  = document.createElement('div');
+  div.className = 'msg ' + role;
+
+  const bubbleInner = role === 'ai'
+    ? `<div class="md">${marked.parse(text)}</div>`
+    : escHtml(text);
+
+  div.innerHTML = `
+    <div class="avatar">${role === 'user' ? 'AP' : 'AI'}</div>
+    <div class="msg-body">
+      <div class="bubble">${bubbleInner}</div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span class="msg-time">${time}</span>
+        ${role === 'ai' ? `<button class="copy-btn" onclick="copyText(this,'${esc(text)}')">Copy</button>` : ''}
+      </div>
+    </div>`;
+  msgs.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function addThinking() {
+  const msgs = document.getElementById('msgs');
+  const div  = document.createElement('div');
+  div.className = 'thinking';
+  div.innerHTML = `
+    <div class="avatar" style="background:var(--navy);color:var(--gold);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0">AI</div>
+    <div class="dots"><span></span><span></span><span></span></div>`;
+  msgs.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function usePrompt(el) {
+  inp.value = el.textContent;
+  inp.dispatchEvent(new Event('input'));
+  send();
+}
+
+function clearChat() {
+  history.length = 0;
+  const msgs = document.getElementById('msgs');
+  msgs.innerHTML = `
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <h3>Admin AI Hub</h3>
+      <p>Your PLC planning partner. Ask me anything — agendas, scripts, reteach plans, follow-up emails, and more.</p>
+      <div class="prompts">
+        <button class="pchip" onclick="usePrompt(this)">Generate this week's PLC package</button>
+        <button class="pchip" onclick="usePrompt(this)">Write a follow-up email from today's meeting</button>
+        <button class="pchip" onclick="usePrompt(this)">My teachers can't agree on what proficient looks like</button>
+        <button class="pchip" onclick="usePrompt(this)">Give me a 60-min reteach planning agenda</button>
+        <button class="pchip" onclick="usePrompt(this)">What equity questions should I ask in my PLC?</button>
+        <button class="pchip" onclick="usePrompt(this)">How do I redirect an off-track PLC conversation?</button>
+      </div>
+    </div>`;
+  btn.disabled = true;
+}
+
+function copyText(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function scrollBottom() {
+  const msgs = document.getElementById('msgs');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function esc(s) {
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
+}
+</script>
+</body>
+</html>
